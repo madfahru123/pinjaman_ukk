@@ -40,19 +40,52 @@ class _PengembalianPageState extends State<PengembalianPage> {
     }
   }
 
-  Future<void> terimaPengembalian(int id) async {
-    await supabase
-        .from('peminjaman')
-        .update({'status': 'selesai'})
-        .eq('id', id);
+  /// =========================
+  /// TERIMA + LOG AKTIVITAS
+  /// =========================
+  Future<void> terimaPengembalian(int id, int alatId) async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
 
-    fetchPengembalian();
+      await supabase
+          .from('peminjaman')
+          .update({'status': 'selesai'})
+          .eq('id', id);
+
+      await supabase.from('log_aktivitas').insert({
+        'aksi': 'Petugas menerima pengembalian alat (ID: $alatId)',
+        'userid': user.id,
+      });
+
+      fetchPengembalian();
+    } catch (e) {
+      debugPrint('ERROR terima pengembalian: $e');
+    }
   }
 
-  Future<void> dendaPengembalian(int id) async {
-    await supabase.from('peminjaman').update({'status': 'denda'}).eq('id', id);
+  /// =========================
+  /// DENDA / TOLAK + LOG
+  /// =========================
+  Future<void> dendaPengembalian(int id, int alatId) async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
 
-    fetchPengembalian();
+      await supabase
+          .from('peminjaman')
+          .update({'status': 'denda'})
+          .eq('id', id);
+
+      await supabase.from('log_aktivitas').insert({
+        'aksi': 'Petugas memberi denda pengembalian alat (ID: $alatId)',
+        'userid': user.id,
+      });
+
+      fetchPengembalian();
+    } catch (e) {
+      debugPrint('ERROR denda pengembalian: $e');
+    }
   }
 
   @override
@@ -94,13 +127,13 @@ class _PengembalianPageState extends State<PengembalianPage> {
                         Text('Jumlah : ${item['jumlah']}'),
                         Text('Durasi : ${item['durasi']} hari'),
                         Text('Tanggal Dikembalikan : ${item['created_at']}'),
-
                         const SizedBox(height: 12),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             ElevatedButton(
-                              onPressed: () => dendaPengembalian(item['id']),
+                              onPressed: () =>
+                                  dendaPengembalian(item['id'], item['alatid']),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.red,
                               ),
@@ -120,7 +153,10 @@ class _PengembalianPageState extends State<PengembalianPage> {
                                 );
 
                                 if (result == true) {
-                                  fetchPengembalian(); // refresh list setelah submit
+                                  await terimaPengembalian(
+                                    item['id'],
+                                    item['alatid'],
+                                  );
                                 }
                               },
                               style: ElevatedButton.styleFrom(

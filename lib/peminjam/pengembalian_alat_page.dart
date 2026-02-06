@@ -174,6 +174,13 @@ class _PengembalianAlatPageState extends State<PengembalianAlatPage> {
                                           required String kondisi,
                                           required String kerusakan,
                                         }) async {
+                                          final user =
+                                              supabase.auth.currentUser;
+                                          if (user == null) return;
+
+                                          final alatNama =
+                                              alat['nama_alat'] ?? '-';
+
                                           await supabase
                                               .from('peminjaman')
                                               .update({
@@ -181,9 +188,18 @@ class _PengembalianAlatPageState extends State<PengembalianAlatPage> {
                                                 'kelengkapan': kelengkapan,
                                                 'kondisi_pengembalian': kondisi,
                                                 'catatan_kerusakan': kerusakan,
-                                                'status': 'pending',
+                                                'status':
+                                                    'pengembalian_diajukan',
                                               })
                                               .eq('id', item['id']);
+
+                                          await supabase
+                                              .from('log_aktivitas')
+                                              .insert({
+                                                'aksi':
+                                                    'Peminjam mengajukan pengembalian alat $alatNama',
+                                                'userid': user.id,
+                                              });
 
                                           fetchDipinjam();
                                         },

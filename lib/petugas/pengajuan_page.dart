@@ -49,9 +49,32 @@ class _PengajuanPageState extends State<PengajuanPage> {
     }
   }
 
-  Future<void> updateStatus(int id, String status) async {
+  /// =====================
+  /// UPDATE STATUS + LOG
+  /// =====================
+  Future<void> updateStatus(int id, String status, String alatNama) async {
     try {
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      // update status peminjaman
       await supabase.from('peminjaman').update({'status': status}).eq('id', id);
+
+      // log aktivitas
+      String aksiLog = '';
+      if (status == 'dipinjam') {
+        aksiLog = 'Petugas menyetujui peminjaman alat $alatNama';
+      } else if (status == 'ditolak') {
+        aksiLog = 'Petugas menolak peminjaman alat $alatNama';
+      }
+
+      if (aksiLog.isNotEmpty) {
+        await supabase.from('log_aktivitas').insert({
+          'aksi': aksiLog,
+          'userid': user.id,
+        });
+      }
+
       fetchPengajuan();
     } catch (e) {
       debugPrint("UPDATE ERROR: $e");
@@ -131,7 +154,6 @@ class _PengajuanPageState extends State<PengajuanPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      /// FOTO ALAT
                       if (fotoAlat.isNotEmpty)
                         ClipRRect(
                           borderRadius: const BorderRadius.vertical(
@@ -144,13 +166,11 @@ class _PengajuanPageState extends State<PengajuanPage> {
                             fit: BoxFit.cover,
                           ),
                         ),
-
                       Padding(
                         padding: const EdgeInsets.all(16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            /// NAMA ALAT
                             Text(
                               namaAlat,
                               style: const TextStyle(
@@ -159,16 +179,12 @@ class _PengajuanPageState extends State<PengajuanPage> {
                               ),
                             ),
                             const SizedBox(height: 8),
-
                             Text("Peminjam : $email"),
                             Text("Jumlah    : $jumlah"),
                             Text("Kelengkapan : $kelengkapan"),
                             Text("Tanggal   : $tanggal"),
                             Text("Durasi    : $durasi hari"),
-
                             const SizedBox(height: 12),
-
-                            /// STATUS + TOMBOL
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -200,8 +216,11 @@ class _PengajuanPageState extends State<PengajuanPage> {
                                           ),
                                         ),
                                       ),
-                                      onPressed: () =>
-                                          updateStatus(id, 'dipinjam'),
+                                      onPressed: () => updateStatus(
+                                        id,
+                                        'dipinjam',
+                                        namaAlat,
+                                      ),
                                       child: const Text("ACC"),
                                     ),
                                     const SizedBox(width: 8),
@@ -215,7 +234,7 @@ class _PengajuanPageState extends State<PengajuanPage> {
                                         ),
                                       ),
                                       onPressed: () =>
-                                          updateStatus(id, 'ditolak'),
+                                          updateStatus(id, 'ditolak', namaAlat),
                                       child: const Text("Tolak"),
                                     ),
                                   ],
