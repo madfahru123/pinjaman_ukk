@@ -112,8 +112,15 @@ class _AlatPageState extends State<AlatPage> {
     );
 
     if (confirm != true) return;
-
     await supabase.from('alat').delete().eq('id', id);
+
+    await supabase.from('log_aktivitas').insert({
+      'aksi': 'Admin hapus alat ID $id',
+      'userid': supabase.auth.currentUser!.id,
+    });
+
+    fetchAlat();
+
     fetchAlat();
 
     ScaffoldMessenger.of(
@@ -520,10 +527,20 @@ class _TambahAlatPageState extends State<TambahAlatPage> {
                         .from('alat')
                         .update(data)
                         .eq('id', widget.alat!['id']);
+
+                    await supabase.from('log_aktivitas').insert({
+                      'aksi': 'Admin edit alat ${nama.text}',
+                      'userid': user.id,
+                    });
                   } else {
                     await supabase.from('alat').insert({
                       ...data,
                       'user_id': user.id,
+                    });
+
+                    await supabase.from('log_aktivitas').insert({
+                      'aksi': 'Admin nambah alat ${nama.text}',
+                      'userid': user.id,
                     });
                   }
 

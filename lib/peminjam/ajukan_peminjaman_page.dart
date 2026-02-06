@@ -360,6 +360,11 @@ class _AjukanPeminjamanPageState extends State<AjukanPeminjamanPage> {
       'status': 'pending',
     });
 
+    await supabase.from('log_aktivitas').insert({
+      'aksi': 'Peminjam mengajukan peminjaman alat ${widget.alat['nama_alat']}',
+      'userid': user.id,
+    });
+
     if (!mounted) return;
     Navigator.pop(context);
   }
