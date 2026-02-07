@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'penerimaan_page.dart';
+import 'denda_page.dart';
 
 class PengembalianPage extends StatefulWidget {
   const PengembalianPage({super.key});
@@ -11,6 +12,7 @@ class PengembalianPage extends StatefulWidget {
 
 class _PengembalianPageState extends State<PengembalianPage> {
   final supabase = Supabase.instance.client;
+
   List<Map<String, dynamic>> listPengembalian = [];
   bool isLoading = true;
 
@@ -20,6 +22,7 @@ class _PengembalianPageState extends State<PengembalianPage> {
     fetchPengembalian();
   }
 
+  // ================= FETCH DATA =================
   Future<void> fetchPengembalian() async {
     try {
       setState(() => isLoading = true);
@@ -27,22 +30,22 @@ class _PengembalianPageState extends State<PengembalianPage> {
       final data = await supabase
           .from('peminjaman')
           .select()
-          .eq('status', 'pending')
-          .order('created_at', ascending: true);
+          .eq('status', 'pengembalian_diajukan')
+          .order('tanggal_kembalikan', ascending: true);
+
+      if (!mounted) return;
 
       setState(() {
         listPengembalian = List<Map<String, dynamic>>.from(data);
         isLoading = false;
       });
     } catch (e) {
+      debugPrint('ERROR fetch pengembalian: $e');
       setState(() => isLoading = false);
-      debugPrint('ERROR pengembalian: $e');
     }
   }
 
-  /// =========================
-  /// TERIMA + LOG AKTIVITAS
-  /// =========================
+  // ================= TERIMA =================
   Future<void> terimaPengembalian(int id, int alatId) async {
     try {
       final user = supabase.auth.currentUser;
@@ -64,30 +67,67 @@ class _PengembalianPageState extends State<PengembalianPage> {
     }
   }
 
-  /// =========================
-  /// DENDA / TOLAK + LOG
-  /// =========================
-  Future<void> dendaPengembalian(int id, int alatId) async {
+  // ================= DENDA / RUSAK =================
+  Future<void> dendaPengembalian(
+    int peminjamanId,
+    int alatId,
+    String peminjamId,
+  ) async {
     try {
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
+      // ===============================
+      // AMBIL NOMINAL DENDA DARI TABEL ALAT
+      // ===============================
+      final alat = await supabase
+          .from('alat')
+          .select('denda')
+          .eq('id', alatId)
+          .single();
+
+      final int nominalDenda = int.tryParse(alat['denda'].toString()) ?? 0;
+
+      // ===============================
+      // INSERT KE TABEL DENDA (SESUAI DB)
+      // ===============================
+      await supabase.from('denda').insert({
+        'peminjamid': peminjamId,
+        'jumlah_denda': nominalDenda,
+        'status': 'belum_bayar',
+      });
+
+      // ===============================
+      // UPDATE STATUS PEMINJAMAN
+      // ===============================
       await supabase
           .from('peminjaman')
           .update({'status': 'denda'})
-          .eq('id', id);
+          .eq('id', peminjamanId);
 
+      // ===============================
+      // LOG AKTIVITAS
+      // ===============================
       await supabase.from('log_aktivitas').insert({
         'aksi': 'Petugas memberi denda pengembalian alat (ID: $alatId)',
         'userid': user.id,
       });
 
-      fetchPengembalian();
+      if (!mounted) return;
+
+      // ===============================
+      // PINDAH KE DENDA PAGE (AWAIT!)
+      // ===============================
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const DendaPage()),
+      );
     } catch (e) {
       debugPrint('ERROR denda pengembalian: $e');
     }
   }
 
+  // ================= UI =================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -98,7 +138,7 @@ class _PengembalianPageState extends State<PengembalianPage> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : listPengembalian.isEmpty
-          ? const Center(child: Text('Tidak ada pengembalian'))
+          ? const Center(child: Text('Tidak ada pengajuan pengembalian'))
           : ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: listPengembalian.length,
@@ -124,21 +164,35 @@ class _PengembalianPageState extends State<PengembalianPage> {
                         ),
                         const SizedBox(height: 6),
                         Text('User ID : ${item['userid']}'),
-                        Text('Jumlah : ${item['jumlah']}'),
+                        Text('Jumlah dipinjam : ${item['jumlah']}'),
+                        Text(
+                          'Jumlah dikembalikan : ${item['jumlah_dikembalikan']}',
+                        ),
                         Text('Durasi : ${item['durasi']} hari'),
-                        Text('Tanggal Dikembalikan : ${item['created_at']}'),
+                        Text(
+                          'Tanggal dikembalikan : ${item['tanggal_kembalikan']}',
+                        ),
                         const SizedBox(height: 12),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             ElevatedButton(
-                              onPressed: () =>
-                                  dendaPengembalian(item['id'], item['alatid']),
+                              onPressed: () async {
+                                await dendaPengembalian(
+                                  item['id'],
+                                  item['alatid'],
+                                  item['userid'],
+                                );
+
+                                // 👉 setelah balik dari DendaPage, refresh list
+                                fetchPengembalian();
+                              },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.red,
                               ),
                               child: const Text('Rusak / Denda'),
                             ),
+
                             const SizedBox(width: 8),
                             ElevatedButton(
                               onPressed: () async {
