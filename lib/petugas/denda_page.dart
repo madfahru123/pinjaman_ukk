@@ -1,7 +1,66 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class DendaPage extends StatelessWidget {
+class DendaPage extends StatefulWidget {
   const DendaPage({super.key});
+
+  @override
+  State<DendaPage> createState() => _DendaPageState();
+}
+
+class _DendaPageState extends State<DendaPage> {
+  final supabase = Supabase.instance.client;
+
+  List<Map<String, dynamic>> listDenda = [];
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchDenda();
+  }
+
+  // ================= FETCH DENDA =================
+  Future<void> fetchDenda() async {
+    try {
+      setState(() => loading = true);
+
+      final data = await supabase
+          .from('denda')
+          .select()
+          .order('id', ascending: false);
+
+      if (!mounted) return;
+
+      setState(() {
+        listDenda = List<Map<String, dynamic>>.from(data);
+        loading = false;
+      });
+    } catch (e) {
+      debugPrint('ERROR fetch denda: $e');
+      setState(() => loading = false);
+    }
+  }
+
+  // ================= TANDAI LUNAS =================
+  Future<void> tandaiLunas(int dendaId) async {
+    try {
+      await supabase
+          .from('denda')
+          .update({'status': 'lunas'})
+          .eq('id', dendaId);
+
+      fetchDenda();
+    } catch (e) {
+      debugPrint('ERROR update denda: $e');
+    }
+  }
+
+  int get totalDendaAktif {
+    return listDenda
+        .where((e) => e['status'] == 'belum_bayar')
+        .fold<int>(0, (sum, e) => sum + (e['jumlah_denda'] as int));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,30 +72,18 @@ class DendaPage extends StatelessWidget {
         foregroundColor: Colors.white,
         elevation: 0,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _summaryCard(),
-          const SizedBox(height: 16),
-
-          _dendaCard(
-            nama: "Andi Pratama",
-            alat: "Kamera Canon",
-            alasan: "Terlambat 2 Hari",
-            nominal: 50000,
-            status: "Belum Bayar",
-            statusColor: Colors.orange,
-          ),
-          _dendaCard(
-            nama: "Budi Santoso",
-            alat: "Tripod",
-            alasan: "Rusak Ringan",
-            nominal: 100000,
-            status: "Lunas",
-            statusColor: Colors.green,
-          ),
-        ],
-      ),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : listDenda.isEmpty
+          ? const Center(child: Text("Tidak ada data denda"))
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _summaryCard(),
+                const SizedBox(height: 16),
+                ...listDenda.map(_dendaCard),
+              ],
+            ),
     );
   }
 
@@ -49,13 +96,6 @@ class DendaPage extends StatelessWidget {
           colors: [Colors.red.shade400, Colors.red.shade600],
         ),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.red.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Row(
         children: [
@@ -63,15 +103,15 @@ class DendaPage extends StatelessWidget {
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
+            children: [
+              const Text(
                 "Total Denda Aktif",
                 style: TextStyle(color: Colors.white70),
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
-                "Rp 150.000",
-                style: TextStyle(
+                "Rp ${_rupiah(totalDendaAktif)}",
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -85,14 +125,9 @@ class DendaPage extends StatelessWidget {
   }
 
   // ================= DENDA CARD =================
-  Widget _dendaCard({
-    required String nama,
-    required String alat,
-    required String alasan,
-    required int nominal,
-    required String status,
-    required Color statusColor,
-  }) {
+  Widget _dendaCard(Map<String, dynamic> item) {
+    final bool lunas = item['status'] == 'lunas';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -115,10 +150,10 @@ class DendaPage extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  nama,
+                  'Peminjam ID: ${item['peminjamid']}',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                    fontSize: 13,
                   ),
                 ),
               ),
@@ -128,13 +163,15 @@ class DendaPage extends StatelessWidget {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.15),
+                  color: lunas
+                      ? Colors.green.withOpacity(0.15)
+                      : Colors.orange.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  status,
+                  lunas ? 'LUNAS' : 'BELUM BAYAR',
                   style: TextStyle(
-                    color: statusColor,
+                    color: lunas ? Colors.green : Colors.orange,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
@@ -143,35 +180,34 @@ class DendaPage extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 6),
-          Text(alat, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          const SizedBox(height: 8),
+
+          Text(
+            'Jenis denda: ${item['jenis_denda']}',
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          ),
 
           const Divider(height: 20),
 
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _infoItem("Alasan", alasan),
-              _infoItem("Nominal", "Rp ${_rupiah(nominal)}"),
+              _infoItem("Nominal", "Rp ${_rupiah(item['jumlah_denda'])}"),
+              _infoItem("Status", item['status']),
             ],
           ),
 
           const SizedBox(height: 12),
 
-          // ===== ACTION =====
-          if (status != "Lunas")
+          if (!lunas)
             Align(
               alignment: Alignment.centerRight,
               child: ElevatedButton.icon(
-                onPressed: () {},
+                onPressed: () => tandaiLunas(item['id']),
                 icon: const Icon(Icons.check_circle),
                 label: const Text("Tandai Lunas"),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
