@@ -28,14 +28,27 @@ class _PengembalianAlatPageState extends State<PengembalianAlatPage> {
     try {
       final res = await supabase
           .from('peminjaman')
-          .select(
-            'id, alatid, jumlah, durasi, status, alat:alatid(nama_alat, stok, kondisi)',
+          .select('''
+          id,
+          alatid,
+          jumlah,
+          durasi,
+          status,
+          alat:alatid(
+            nama_alat,
+            stok,
+            foto,
+            kategori:kategori_id(nama)
           )
+          ''')
           .eq('userid', user.id)
           .eq('status', 'dipinjam');
 
       if (!mounted) return;
-      dipinjamList = (res as List).cast<Map<String, dynamic>>();
+
+      setState(() {
+        dipinjamList = List<Map<String, dynamic>>.from(res as List);
+      });
     } catch (e) {
       debugPrint("FETCH DIPINJAM ERROR: $e");
     } finally {
@@ -68,6 +81,8 @@ class _PengembalianAlatPageState extends State<PengembalianAlatPage> {
                 final item = dipinjamList[index];
                 final alat = item['alat'] ?? {};
                 final jumlah = item['jumlah'];
+                final kategori = alat['kategori']?['nama'] ?? '-';
+                final foto = alat['foto'];
 
                 return Card(
                   elevation: 4,
@@ -84,8 +99,25 @@ class _PengembalianAlatPageState extends State<PengembalianAlatPage> {
                         /// HEADER
                         Row(
                           children: [
-                            const Icon(Icons.devices, color: Colors.blueAccent),
-                            const SizedBox(width: 8),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: foto != null && foto.toString().isNotEmpty
+                                  ? Image.network(
+                                      foto,
+                                      width: 56,
+                                      height: 56,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Container(
+                                      width: 56,
+                                      height: 56,
+                                      color: Colors.grey.shade200,
+                                      child: const Icon(
+                                        Icons.image_not_supported,
+                                      ),
+                                    ),
+                            ),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Text(
                                 alat['nama_alat'] ?? "-",
@@ -114,11 +146,7 @@ class _PengembalianAlatPageState extends State<PengembalianAlatPage> {
                               "Stok",
                               "${alat['stok'] ?? '-'}",
                             ),
-                            _infoChip(
-                              Icons.info_outline,
-                              "Kondisi",
-                              alat['kondisi'] ?? "-",
-                            ),
+                            _infoChip(Icons.category, "Kategori", kategori),
                           ],
                         ),
 
@@ -170,8 +198,7 @@ class _PengembalianAlatPageState extends State<PengembalianAlatPage> {
                                     ),
                                     onSubmit:
                                         ({
-                                          required String kelengkapan,
-                                          required String kondisi,
+                                          required String statusPengembalian,
                                           required String kerusakan,
                                         }) async {
                                           final user =
@@ -185,8 +212,8 @@ class _PengembalianAlatPageState extends State<PengembalianAlatPage> {
                                               .from('peminjaman')
                                               .update({
                                                 'jumlah_dikembalikan': jumlah,
-                                                'kelengkapan': kelengkapan,
-                                                'kondisi_pengembalian': kondisi,
+                                                'status_pengembalian':
+                                                    statusPengembalian, // 🔥 BARU
                                                 'catatan_kerusakan': kerusakan,
                                                 'status':
                                                     'pengembalian_diajukan',

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:pinjaman_ukk/alat_page_local.dart';
-import 'package:pinjaman_ukk/profil_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../login_page.dart';
 import 'pengajuan_page.dart';
@@ -19,13 +18,39 @@ class PetugasHomePage extends StatefulWidget {
 class _PetugasHomePageState extends State<PetugasHomePage> {
   int _currentIndex = 0;
 
-  // ================= LOGOUT =================
-  Future<void> _logout(BuildContext context) async {
+  // ================= LOGOUT SUPABASE =================
+  Future<void> _logout() async {
     final supabase = Supabase.instance.client;
     await supabase.auth.signOut();
-    Navigator.of(context).pushAndRemoveUntil(
+    Navigator.pushAndRemoveUntil(
+      context,
       MaterialPageRoute(builder: (_) => const LoginPage()),
       (route) => false,
+    );
+  }
+
+  // ================= DIALOG KONFIRMASI =================
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Konfirmasi Logout"),
+        content: const Text("Yakin arep logout saka akun petugas?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Batal"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              Navigator.pop(context);
+              _logout();
+            },
+            child: const Text("Logout"),
+          ),
+        ],
+      ),
     );
   }
 
@@ -111,7 +136,6 @@ class _PetugasHomePageState extends State<PetugasHomePage> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: [
-                // ==== Row 1: Denda & Pengembalian ====
                 Row(
                   children: [
                     Expanded(
@@ -120,14 +144,10 @@ class _PetugasHomePageState extends State<PetugasHomePage> {
                         title: "Denda",
                         subtitle: "Kerusakan / Telat",
                         color: Colors.red,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const DendaPage(),
-                            ),
-                          );
-                        },
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const DendaPage()),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -137,20 +157,15 @@ class _PetugasHomePageState extends State<PetugasHomePage> {
                         title: "Pengembalian",
                         subtitle: "Alat kembali",
                         color: Colors.green,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => PengembalianPage(),
-                            ),
-                          );
-                        },
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => PengembalianPage()),
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                // ==== Row 2: Dipinjam ====
                 Row(
                   children: [
                     Expanded(
@@ -159,14 +174,12 @@ class _PetugasHomePageState extends State<PetugasHomePage> {
                         title: "Dipinjam",
                         subtitle: "Sedang dipinjam",
                         color: Colors.blue,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const DipinjamPage(),
-                            ),
-                          );
-                        },
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const DipinjamPage(),
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -175,8 +188,6 @@ class _PetugasHomePageState extends State<PetugasHomePage> {
             ),
           ),
           const SizedBox(height: 20),
-
-          // ===== PERMINTAAN PEMINJAM =====
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Align(
@@ -190,16 +201,20 @@ class _PetugasHomePageState extends State<PetugasHomePage> {
           const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _menuCard(
-              icon: Icons.assignment,
-              title: "Pengajuan Peminjaman",
-              subtitle: "ACC / Tolak permintaan",
-              onTap: () {
-                Navigator.push(
+            child: Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ListTile(
+                leading: const Icon(Icons.assignment, color: Colors.blue),
+                title: const Text("Pengajuan Peminjaman"),
+                subtitle: const Text("ACC / Tolak permintaan"),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => PengajuanPage()),
-                );
-              },
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 20),
@@ -208,81 +223,12 @@ class _PetugasHomePageState extends State<PetugasHomePage> {
     );
   }
 
-  // ================= MENU CARD DEFAULT =================
-  Widget _menuCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Colors.blue.withOpacity(0.1),
-          child: Icon(icon, color: Colors.blue),
-        ),
-        title: Text(title),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-        onTap: onTap,
-      ),
-    );
-  }
-
-  // ================= PROFIL PAGE =================
-  Widget _profilPage() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          const CircleAvatar(radius: 40, child: Icon(Icons.person, size: 40)),
-          const SizedBox(height: 12),
-          const Text(
-            "Petugas",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ProfilTokoPage(canEdit: false),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.store),
-              label: const Text("Lihat Profil Toko"),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () => _logout(context),
-              icon: const Icon(Icons.logout),
-              label: const Text("Logout"),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ================= PLACEHOLDER =================
-
   @override
   Widget build(BuildContext context) {
     final pages = [
       _dashboardPage(),
       const AlatPage(),
       const RiwayatPetugasPage(),
-      _profilPage(),
     ];
 
     return Scaffold(
@@ -321,9 +267,7 @@ class _PetugasHomePageState extends State<PetugasHomePage> {
                       ? "Beranda Petugas"
                       : _currentIndex == 1
                       ? "Daftar Alat"
-                      : _currentIndex == 2
-                      ? "Riwayat"
-                      : "Profil",
+                      : "Riwayat",
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
@@ -338,15 +282,21 @@ class _PetugasHomePageState extends State<PetugasHomePage> {
       body: pages[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
         type: BottomNavigationBarType.fixed,
         selectedItemColor: Colors.blue,
         unselectedItemColor: Colors.grey,
+        onTap: (i) {
+          if (i == 3) {
+            _showLogoutDialog();
+            return;
+          }
+          setState(() => _currentIndex = i);
+        },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Beranda"),
           BottomNavigationBarItem(icon: Icon(Icons.build), label: "Alat"),
           BottomNavigationBarItem(icon: Icon(Icons.history), label: "Riwayat"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profil"),
+          BottomNavigationBarItem(icon: Icon(Icons.logout), label: "Logout"),
         ],
       ),
     );

@@ -57,10 +57,10 @@ class _PengajuanPageState extends State<PengajuanPage> {
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
-      // update status peminjaman
+      // 1️⃣ update status dulu
       await supabase.from('peminjaman').update({'status': status}).eq('id', id);
 
-      // log aktivitas
+      // 2️⃣ baru bikin log
       String aksiLog = '';
       if (status == 'dipinjam') {
         aksiLog = 'Petugas menyetujui peminjaman alat $alatNama';
@@ -70,8 +70,8 @@ class _PengajuanPageState extends State<PengajuanPage> {
 
       if (aksiLog.isNotEmpty) {
         await supabase.from('log_aktivitas').insert({
+          'userid': user.id, // HARUS ADA DI profiles.userid
           'aksi': aksiLog,
-          'userid': user.id,
         });
       }
 

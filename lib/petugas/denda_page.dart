@@ -182,9 +182,9 @@ class _DendaPageState extends State<DendaPage> {
 
           const SizedBox(height: 8),
 
-          Text(
-            'Jenis denda: ${item['jenis_denda']}',
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          const Text(
+            'Jenis denda: Keterlambatan',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
           ),
 
           const Divider(height: 20),

@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'peminjam/ajukan_peminjaman_page.dart';
+import 'kategori_page.dart';
 
 /// =======================================================
 /// ====================== LIST ALAT ======================
@@ -26,14 +27,15 @@ class _AlatPageState extends State<AlatPage> {
   List<Map<String, dynamic>> alatList = [];
   List<Map<String, dynamic>> filteredAlatList = [];
   String selectedKategori = "Semua";
+  List<String> kategoriList = ["Semua"];
 
-  final List<String> kategoriList = [
-    "Semua",
-    "Komputer",
-    "Keyboard",
-    "Mouse",
-    "Proyektor",
-  ];
+  Future<void> fetchKategori() async {
+    final data = await supabase.from('kategori').select('nama');
+
+    setState(() {
+      kategoriList = ["Semua", ...data.map<String>((k) => k['nama']).toList()];
+    });
+  }
 
   bool isAdmin = false;
 
@@ -44,13 +46,28 @@ class _AlatPageState extends State<AlatPage> {
     super.initState();
     fetchAlat();
     loadRole();
+    fetchKategori(); // 🔥 WAJIB
   }
 
   Future<void> fetchAlat() async {
-    final data = await supabase.from('alat').select().order('created_at');
+    final data = await supabase
+        .from('alat')
+        .select('''
+        id,
+        nama_alat,
+        stok,
+        denda,
+        foto,
+        kategori:kategori_id (
+          id,
+          nama
+        )
+      ''')
+        .order('created_at');
+
     setState(() {
       alatList = List<Map<String, dynamic>>.from(data);
-      filteredAlatList = alatList; // tambahkan iki
+      filteredAlatList = alatList;
     });
   }
 
@@ -76,12 +93,12 @@ class _AlatPageState extends State<AlatPage> {
   void filterAlat(String query) {
     final filtered = alatList.where((alat) {
       final nama = alat['nama_alat']?.toLowerCase() ?? '';
-      final kategori = alat['kategori']?.toLowerCase() ?? '';
+      final kategoriNama = alat['kategori']?['nama']?.toLowerCase() ?? '';
 
       final cocokNama = nama.contains(query.toLowerCase());
       final cocokKategori =
           selectedKategori == "Semua" ||
-          kategori == selectedKategori.toLowerCase();
+          kategoriNama == selectedKategori.toLowerCase();
 
       return cocokNama && cocokKategori;
     }).toList();
@@ -186,6 +203,19 @@ class _AlatPageState extends State<AlatPage> {
               },
             ),
           ),
+          if (isAdmin)
+            ListTile(
+              leading: const Icon(Icons.category),
+              title: const Text("Kategori"),
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const KategoriPage()),
+                );
+                fetchKategori();
+                filterAlat(searchQuery);
+              },
+            ),
 
           // List alat
           Expanded(
@@ -221,8 +251,8 @@ class _AlatPageState extends State<AlatPage> {
                           ),
                           subtitle: Text(
                             "Stok: ${alat["stok"]}\n"
-                            "Kategori: ${alat["kategori"] ?? '-'}\n"
-                            "Denda: Rp ${alat["denda"]}\n",
+                            "Kategori: ${alat["kategori"]?["nama"] ?? '-'}\n"
+                            "Denda: Rp ${alat["denda"]}",
                           ),
 
                           trailing: isAdmin
@@ -349,16 +379,9 @@ class _TambahAlatPageState extends State<TambahAlatPage> {
   final stok = TextEditingController();
   final deskripsi = TextEditingController();
   final denda = TextEditingController();
-  String kategori = "Komputer";
-  final Map<String, List<String>> kelengkapanByKategori = {
-    "Komputer": ["CPU", "Monitor", "Keyboard", "Mouse"],
-    "Keyboard": ["Kabel", "Dongle"],
-    "Mouse": ["Kabel", "Dongle"],
-    "Proyektor": ["Kabel HDMI", "Remote", "Tas"],
-  };
 
-  late String kelengkapan;
-
+  List<Map<String, dynamic>> kategoriList = [];
+  int? selectedKategoriId;
   XFile? pickedImage;
   String? imageUrl;
 
@@ -368,33 +391,21 @@ class _TambahAlatPageState extends State<TambahAlatPage> {
   @override
   void initState() {
     super.initState();
+    fetchKategori();
 
     if (widget.alat != null) {
-      kategori = widget.alat!['kategori'] ?? 'Komputer';
-      kelengkapan =
-          widget.alat!['kelengkapan'] ?? kelengkapanByKategori[kategori]!.first;
-      if (![
-        "Lengkap",
-        ...kelengkapanByKategori[kategori]!,
-      ].contains(kelengkapan)) {
-        kelengkapan = "Lengkap";
-      }
+      selectedKategoriId = widget.alat!['kategori']?['id'];
       nama.text = widget.alat!['nama_alat'] ?? '';
       stok.text = widget.alat!['stok'].toString();
       deskripsi.text = widget.alat!['deskripsi'] ?? '';
       denda.text = widget.alat!['denda']?.toString() ?? '';
       imageUrl = widget.alat!['foto'];
-    } else {
-      kategori = 'Komputer';
-      kelengkapan = kelengkapanByKategori[kategori]!.first;
     }
   }
 
   Future pickImage() async {
     final img = await picker.pickImage(source: ImageSource.gallery);
-    if (img != null) {
-      setState(() => pickedImage = img);
-    }
+    if (img != null) setState(() => pickedImage = img);
   }
 
   Future<String?> uploadImage(XFile file) async {
@@ -415,145 +426,164 @@ class _TambahAlatPageState extends State<TambahAlatPage> {
     return supabase.storage.from('alat').getPublicUrl(fileName);
   }
 
+  Future<void> fetchKategori() async {
+    final data = await supabase.from('kategori').select().order('nama');
+
+    setState(() {
+      kategoriList = List<Map<String, dynamic>>.from(data);
+      selectedKategoriId ??= kategoriList.isNotEmpty
+          ? kategoriList.first['id']
+          : null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.alat != null;
 
     return Scaffold(
-      appBar: AppBar(title: Text(isEdit ? "Edit Alat" : "Tambah Alat")),
+      backgroundColor: Colors.grey.shade100,
+      appBar: AppBar(
+        title: Text(isEdit ? "Edit Alat" : "Tambah Alat"),
+        centerTitle: true,
+        elevation: 0,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            /// ===== FOTO =====
             GestureDetector(
               onTap: pickImage,
-              child: Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: pickedImage != null
-                    ? kIsWeb
-                          ? Image.network(pickedImage!.path, fit: BoxFit.cover)
-                          : Image.file(
-                              File(pickedImage!.path),
-                              fit: BoxFit.cover,
-                            )
+              child: CircleAvatar(
+                radius: 60,
+                backgroundColor: Colors.grey.shade300,
+                backgroundImage: pickedImage != null
+                    ? (kIsWeb
+                          ? NetworkImage(pickedImage!.path)
+                          : FileImage(File(pickedImage!.path)) as ImageProvider)
                     : imageUrl != null
-                    ? Image.network(imageUrl!, fit: BoxFit.cover)
-                    : const Icon(Icons.image, size: 40),
+                    ? NetworkImage(imageUrl!)
+                    : null,
+                child: pickedImage == null && imageUrl == null
+                    ? const Icon(Icons.camera_alt, size: 36)
+                    : null,
               ),
             ),
-            const SizedBox(height: 16),
-
-            TextField(
-              controller: nama,
-              decoration: const InputDecoration(labelText: "Nama Alat"),
-            ),
-            TextField(
-              controller: stok,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: "Stok"),
-            ),
-            TextField(
-              controller: deskripsi,
-              decoration: const InputDecoration(labelText: "Deskripsi"),
-            ),
-            TextField(
-              controller: denda,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: "Denda (Rp)"),
-            ),
-
-            const SizedBox(height: 12),
-
-            DropdownButtonFormField<String>(
-              value: kategori,
-              decoration: const InputDecoration(labelText: "Kategori"),
-              items: const [
-                DropdownMenuItem(value: "Komputer", child: Text("Komputer")),
-                DropdownMenuItem(value: "Keyboard", child: Text("Keyboard")),
-                DropdownMenuItem(value: "Mouse", child: Text("Mouse")),
-                DropdownMenuItem(value: "Proyektor", child: Text("Proyektor")),
-              ],
-              onChanged: (v) {
-                setState(() {
-                  kategori = v!;
-                  kelengkapan = kelengkapanByKategori[kategori]!.first;
-                });
-              },
-            ),
-            DropdownButtonFormField<String>(
-              value: kelengkapan,
-              decoration: const InputDecoration(labelText: "Kelengkapan"),
-              items: [
-                const DropdownMenuItem(
-                  value: "Lengkap",
-                  child: Text("Lengkap"),
-                ),
-                ...kelengkapanByKategori[kategori]!
-                    .map((k) => DropdownMenuItem(value: k, child: Text(k)))
-                    .toList(),
-              ],
-              onChanged: (v) => setState(() => kelengkapan = v!),
-            ),
-
             const SizedBox(height: 24),
 
-            ElevatedButton(
-              onPressed: () async {
-                try {
-                  final user = supabase.auth.currentUser;
-                  if (user == null) return;
+            /// ===== FORM CARD =====
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  _input(nama, "Nama Alat"),
+                  _input(stok, "Stok", number: true),
+                  _input(deskripsi, "Deskripsi"),
+                  _input(denda, "Denda / Hari", number: true),
 
-                  if (pickedImage != null) {
-                    imageUrl = await uploadImage(pickedImage!);
-                  }
+                  const SizedBox(height: 12),
 
-                  final data = {
-                    'nama_alat': nama.text,
-                    'stok': int.tryParse(stok.text) ?? 0,
-                    'deskripsi': deskripsi.text,
-                    'denda': int.tryParse(denda.text) ?? 0,
-                    'kategori': kategori, // 🔥 INI KUNCINÉ
-                    'kelengkapan': kelengkapan,
-                    'foto': imageUrl,
-                  };
+                  DropdownButtonFormField<int>(
+                    value: selectedKategoriId,
+                    decoration: _decoration("Kategori"),
+                    items: kategoriList.map((k) {
+                      return DropdownMenuItem<int>(
+                        value: k['id'],
+                        child: Text(k['nama']),
+                      );
+                    }).toList(),
+                    onChanged: (v) => setState(() => selectedKategoriId = v),
+                  ),
 
-                  if (isEdit) {
-                    await supabase
-                        .from('alat')
-                        .update(data)
-                        .eq('id', widget.alat!['id']);
+                  const SizedBox(height: 24),
 
-                    await supabase.from('log_aktivitas').insert({
-                      'aksi': 'Admin edit alat ${nama.text}',
-                      'userid': user.id,
-                    });
-                  } else {
-                    await supabase.from('alat').insert({
-                      ...data,
-                      'user_id': user.id,
-                    });
+                  /// ===== BUTTON =====
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: () async {
+                        final user = supabase.auth.currentUser;
+                        if (user == null) return;
 
-                    await supabase.from('log_aktivitas').insert({
-                      'aksi': 'Admin nambah alat ${nama.text}',
-                      'userid': user.id,
-                    });
-                  }
+                        if (pickedImage != null) {
+                          imageUrl = await uploadImage(pickedImage!);
+                        }
 
-                  Navigator.pop(context, true);
-                } catch (e) {
-                  debugPrint("❌ ERROR: $e");
-                }
-              },
-              child: Text(isEdit ? "UPDATE" : "SIMPAN"),
+                        final data = {
+                          'nama_alat': nama.text,
+                          'stok': int.tryParse(stok.text) ?? 0,
+                          'deskripsi': deskripsi.text,
+                          'denda': int.tryParse(denda.text) ?? 0,
+                          'kategori_id': selectedKategoriId,
+                          'foto': imageUrl,
+                        };
+
+                        if (isEdit) {
+                          await supabase
+                              .from('alat')
+                              .update(data)
+                              .eq('id', widget.alat!['id']);
+                        } else {
+                          await supabase.from('alat').insert({
+                            ...data,
+                            'user_id': user.id,
+                          });
+                        }
+
+                        Navigator.pop(context, true);
+                      },
+                      child: Text(
+                        isEdit ? "UPDATE ALAT" : "SIMPAN ALAT",
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  /// ===== HELPER =====
+  Widget _input(TextEditingController c, String label, {bool number = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: c,
+        keyboardType: number ? TextInputType.number : TextInputType.text,
+        decoration: _decoration(label),
+      ),
+    );
+  }
+
+  InputDecoration _decoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
     );
   }
 }

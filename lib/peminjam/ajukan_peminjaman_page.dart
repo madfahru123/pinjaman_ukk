@@ -19,47 +19,17 @@ class _AjukanPeminjamanPageState extends State<AjukanPeminjamanPage> {
   DateTime? tanggalPinjam;
   DateTime? tanggalKembali;
 
-  String? kelengkapanDipilih;
   bool loading = false;
-
-  final Map<String, List<String>> kelengkapanByKategori = {
-    "Komputer": ["CPU", "Monitor", "Keyboard", "Mouse"],
-    "Keyboard": ["Kabel", "Dongle"],
-    "Mouse": ["Kabel", "Dongle"],
-    "Proyektor": ["Kabel HDMI", "Remote", "Tas"],
-  };
 
   int _hitungDurasi(DateTime start, DateTime end) {
     return end.difference(start).inDays + 1;
   }
 
   // ================= OPSI KELENGKAPAN (FINAL) =================
-  List<String> getOpsiKelengkapan() {
-    final kategori = widget.alat['kategori'];
-    final kelengkapanDb = widget.alat['kelengkapan'];
-
-    if (kelengkapanDb == null || kelengkapanDb.toString().isEmpty) {
-      return ["Lengkap"];
-    }
-
-    // nek dudu "Lengkap" → DIKUNCI
-    if (kelengkapanDb != "Lengkap") {
-      return [kelengkapanDb];
-    }
-
-    // nek "Lengkap" → iso milih sesuai kategori
-    if (kategori != null && kelengkapanByKategori.containsKey(kategori)) {
-      return ["Lengkap", ...kelengkapanByKategori[kategori]!];
-    }
-
-    return ["Lengkap"];
-  }
 
   @override
   void initState() {
     super.initState();
-    final opsi = getOpsiKelengkapan();
-    kelengkapanDipilih = opsi.first;
   }
 
   // ================= PILIH TANGGAL =================
@@ -90,9 +60,6 @@ class _AjukanPeminjamanPageState extends State<AjukanPeminjamanPage> {
 
   @override
   Widget build(BuildContext context) {
-    final opsiKelengkapan = getOpsiKelengkapan();
-    final dropdownEnabled = opsiKelengkapan.length > 1;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text("Ajukan Peminjaman"),
@@ -142,7 +109,10 @@ class _AjukanPeminjamanPageState extends State<AjukanPeminjamanPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _infoTile("Stok", "${widget.alat['stok']}"),
-                        _kelengkapanTile(),
+                        _infoTile(
+                          "Kategori",
+                          widget.alat['kategori']?['nama'] ?? "-",
+                        ),
                         _infoTile("Denda", "Rp ${widget.alat['denda']}"),
                       ],
                     ),
@@ -224,23 +194,6 @@ class _AjukanPeminjamanPageState extends State<AjukanPeminjamanPage> {
 
             const SizedBox(height: 16),
 
-            /// DROPDOWN KELENGKAPAN
-            DropdownButtonFormField<String>(
-              value: kelengkapanDipilih,
-              items: opsiKelengkapan
-                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                  .toList(),
-              onChanged: dropdownEnabled
-                  ? (v) => setState(() => kelengkapanDipilih = v)
-                  : null,
-              decoration: InputDecoration(
-                labelText: "Kelengkapan Dipinjam",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-
             const SizedBox(height: 24),
 
             /// BUTTON
@@ -269,42 +222,9 @@ class _AjukanPeminjamanPageState extends State<AjukanPeminjamanPage> {
     );
   }
 
-  // ================= KELENGKAPAN TILE (ANA KATEGORINE) =================
-  Widget _kelengkapanTile() {
-    final kategori = widget.alat['kategori'];
-    final kelengkapanDb = widget.alat['kelengkapan'];
-
-    if (kelengkapanDb != "Lengkap") {
-      return _infoTile("Kelengkapan", kelengkapanDb ?? "-");
-    }
-
-    final list = kelengkapanByKategori[kategori];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text("Kelengkapan", style: TextStyle(color: Colors.grey)),
-        const SizedBox(height: 4),
-        Wrap(
-          spacing: 4,
-          runSpacing: -8,
-          children: (list ?? ["Lengkap"]).map((e) {
-            return Chip(
-              label: Text(e, style: const TextStyle(fontSize: 11)),
-              visualDensity: VisualDensity.compact,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
   // ================= KONFIRMASI =================
   Future<void> _konfirmasiAjukan() async {
-    if (kelengkapanDipilih == null ||
-        tanggalPinjam == null ||
-        tanggalKembali == null) {
+    if (tanggalPinjam == null || tanggalKembali == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Lengkapi semua data terlebih dahulu")),
       );
@@ -321,7 +241,6 @@ class _AjukanPeminjamanPageState extends State<AjukanPeminjamanPage> {
           "Durasi: ${durasi.text} hari\n"
           "Tanggal Pinjam: ${tanggalPinjam!.day}-${tanggalPinjam!.month}-${tanggalPinjam!.year}\n"
           "Tanggal Kembali: ${tanggalKembali!.day}-${tanggalKembali!.month}-${tanggalKembali!.year}\n"
-          "Kelengkapan: $kelengkapanDipilih\n\n"
           "Yakin ingin mengajukan?",
         ),
         actions: [
@@ -354,7 +273,6 @@ class _AjukanPeminjamanPageState extends State<AjukanPeminjamanPage> {
       'userid': user.id,
       'jumlah': int.parse(jumlah.text),
       'durasi': int.parse(durasi.text),
-      'kelengkapan': kelengkapanDipilih,
       'tanggal_pinjaman': tanggalPinjam!.toIso8601String(),
       'tanggal_kembalikan': tanggalKembali!.toIso8601String(),
       'status': 'pending',
