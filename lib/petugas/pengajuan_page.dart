@@ -25,15 +25,18 @@ class _PengajuanPageState extends State<PengajuanPage> {
       final data = await supabase
           .from('peminjaman')
           .select('''
-            id,
-            jumlah,
-            status,
-            durasi,
-            kelengkapan,
-            created_at,
-            alat:alatid(nama_alat, foto),
-            profiles:userid(email)
-          ''')
+  id,
+  jumlah,
+  status,
+  durasi,
+  created_at,
+  alat:alatid(
+    nama_alat,
+    foto,
+    kategori:kategori_id(nama)
+  ),
+  profiles:userid(email)
+''')
           .eq('status', 'pending')
           .order('created_at', ascending: false);
 
@@ -81,6 +84,51 @@ class _PengajuanPageState extends State<PengajuanPage> {
     }
   }
 
+  Future<void> konfirmasiAksi({
+    required BuildContext context,
+    required int id,
+    required String status,
+    required String alatNama,
+  }) async {
+    final isAcc = status == 'dipinjam';
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(isAcc ? "Konfirmasi ACC" : "Konfirmasi Tolak"),
+        content: Text(
+          isAcc
+              ? "Yakin ingin MENYETUJUI peminjaman alat $alatNama?"
+              : "Yakin ingin MENOLAK peminjaman alat $alatNama?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Batal"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isAcc ? Colors.green : Colors.red,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(isAcc ? "Setujui" : "Tolak"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await updateStatus(id, status, alatNama);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isAcc ? "Peminjaman disetujui" : "Peminjaman ditolak"),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -102,9 +150,16 @@ class _PengajuanPageState extends State<PengajuanPage> {
                 String namaAlat = '-';
                 String fotoAlat = '';
                 String email = '-';
-                String kelengkapan = item['kelengkapan'] ?? '-';
+                String kategori = '-';
 
                 final alat = item['alat'];
+                if (alat is Map) {
+                  final kategoriMap = alat['kategori'];
+                  if (kategoriMap is Map) {
+                    kategori = kategoriMap['nama'] ?? '-';
+                  }
+                }
+
                 final profile = item['profiles'];
                 final int durasi =
                     int.tryParse(item['durasi']?.toString() ?? '0') ?? 0;
@@ -181,7 +236,7 @@ class _PengajuanPageState extends State<PengajuanPage> {
                             const SizedBox(height: 8),
                             Text("Peminjam : $email"),
                             Text("Jumlah    : $jumlah"),
-                            Text("Kelengkapan : $kelengkapan"),
+                            Text("Kategori   : $kategori"),
                             Text("Tanggal   : $tanggal"),
                             Text("Durasi    : $durasi hari"),
                             const SizedBox(height: 12),
@@ -216,12 +271,14 @@ class _PengajuanPageState extends State<PengajuanPage> {
                                           ),
                                         ),
                                       ),
-                                      onPressed: () => updateStatus(
-                                        id,
-                                        'dipinjam',
-                                        namaAlat,
+                                      onPressed: () => konfirmasiAksi(
+                                        context: context,
+                                        id: id,
+                                        status: 'dipinjam',
+                                        alatNama: namaAlat,
                                       ),
-                                      child: const Text("ACC"),
+
+                                      child: const Text("TERIMA"),
                                     ),
                                     const SizedBox(width: 8),
                                     ElevatedButton(
@@ -233,8 +290,12 @@ class _PengajuanPageState extends State<PengajuanPage> {
                                           ),
                                         ),
                                       ),
-                                      onPressed: () =>
-                                          updateStatus(id, 'ditolak', namaAlat),
+                                      onPressed: () => konfirmasiAksi(
+                                        context: context,
+                                        id: id,
+                                        status: 'ditolak',
+                                        alatNama: namaAlat,
+                                      ),
                                       child: const Text("Tolak"),
                                     ),
                                   ],

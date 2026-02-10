@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'auth_service.dart';
 import 'main_page.dart';
-import 'petugas/petugas_home_page.dart'; // file sing isi PetugasHomePage
+import 'petugas/petugas_home_page.dart';
 import 'peminjam/peminjam_home_page.dart';
-
-// bukan home_page.dart
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -16,10 +14,77 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+  final authService = AuthService();
 
-  final authService = AuthService(); // ✅ pindah ke State
   bool isLoading = false;
   bool isHidden = true;
+
+  // ================= REDIRECT =================
+  void _redirectByRole(String role) {
+    Widget page;
+
+    switch (role) {
+      case 'admin':
+        page = MainPage();
+        break;
+      case 'petugas':
+        page = PetugasHomePage();
+        break;
+      case 'pinjam':
+        page = PeminjamHomePage();
+        break;
+      default:
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Role tidak ditemukan')));
+        return;
+    }
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => page),
+      (route) => false,
+    );
+  }
+
+  // ================= LOGIN EMAIL =================
+  Future<void> _loginEmail() async {
+    setState(() => isLoading = true);
+
+    final result = await authService.login(
+      email: emailController.text.trim(),
+      password: passwordController.text.trim(),
+    );
+
+    setState(() => isLoading = false);
+
+    if (result['error'] != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result['error'])));
+      return;
+    }
+
+    _redirectByRole(result['role']);
+  }
+
+  // ================= LOGIN GOOGLE =================
+  Future<void> _loginGoogle() async {
+    setState(() => isLoading = true);
+
+    final result = await authService.loginWithGoogle();
+
+    setState(() => isLoading = false);
+
+    if (result['error'] != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result['error'])));
+      return;
+    }
+
+    _redirectByRole(result['role']);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +123,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 20),
 
-                /// EMAIL
+                // EMAIL
                 TextField(
                   controller: emailController,
                   decoration: InputDecoration(
@@ -71,7 +136,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 16),
 
-                /// PASSWORD
+                // PASSWORD
                 TextField(
                   controller: passwordController,
                   obscureText: isHidden,
@@ -83,9 +148,7 @@ class _LoginPageState extends State<LoginPage> {
                         isHidden ? Icons.visibility_off : Icons.visibility,
                       ),
                       onPressed: () {
-                        setState(() {
-                          isHidden = !isHidden;
-                        });
+                        setState(() => isHidden = !isHidden);
                       },
                     ),
                     border: OutlineInputBorder(
@@ -95,90 +158,40 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 24),
 
-                /// BUTTON LOGIN
+                // LOGIN EMAIL BUTTON
                 SizedBox(
                   width: double.infinity,
                   height: 45,
                   child: ElevatedButton(
-                    onPressed: isLoading
-                        ? null
-                        : () async {
-                            setState(() => isLoading = true);
-
-                            final result = await authService.login(
-                              email: emailController.text.trim(),
-                              password: passwordController.text.trim(),
-                            );
-
-                            print('LOGIN RESULT RAW: $result');
-
-                            setState(() => isLoading = false);
-
-                            final error = result['error'];
-
-                            final role = result['role']
-                                ?.toString()
-                                .trim()
-                                .toLowerCase();
-
-                            print('ROLE FINAL: "$role"');
-
-                            if (error != null) {
-                              ScaffoldMessenger.of(
-                                context,
-                              ).showSnackBar(SnackBar(content: Text(error)));
-                              return;
-                            }
-
-                            switch (role) {
-                              case 'admin':
-                                Navigator.of(context).pushAndRemoveUntil(
-                                  MaterialPageRoute(builder: (_) => MainPage()),
-                                  (route) => false,
-                                );
-                                break;
-
-                              case 'petugas':
-                                Navigator.of(context).pushAndRemoveUntil(
-                                  MaterialPageRoute(
-                                    builder: (_) => PetugasHomePage(),
-                                  ),
-                                  (route) => false,
-                                );
-                                break;
-
-                              case 'pinjam':
-                                Navigator.of(context).pushAndRemoveUntil(
-                                  MaterialPageRoute(
-                                    builder: (_) => PeminjamHomePage(),
-                                  ),
-                                  (route) => false,
-                                );
-                                break;
-
-                              default:
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('ROLE TIDAK VALID: "$role"'),
-                                  ),
-                                );
-                            }
-                          },
-
+                    onPressed: isLoading ? null : _loginEmail,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                      elevation: 3,
+                      backgroundColor: Colors.blue,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     child: isLoading
-                        ? const CircularProgressIndicator()
+                        ? const CircularProgressIndicator(color: Colors.white)
                         : const Text(
                             "LOGIN",
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // LOGIN GOOGLE BUTTON
+                SizedBox(
+                  width: double.infinity,
+                  height: 45,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.g_mobiledata, size: 28),
+                    label: const Text(
+                      "Login dengan Google",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: isLoading ? null : _loginGoogle,
                   ),
                 ),
               ],
