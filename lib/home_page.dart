@@ -13,6 +13,12 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final supabase = Supabase.instance.client;
   Map<String, int> dataAlat = {};
+  String rupiah(int angka) {
+    return angka.toString().replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+  }
 
   int totalDenda = 0;
   bool loading = true;
@@ -77,12 +83,32 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<int> fetchTotalDenda() async {
-    final res = await supabase.from('denda').select('jumlah_denda');
+  Future<int> fetchTotalDendaMingguan() async {
+    final now = DateTime.now();
+    final senin = now.subtract(Duration(days: now.weekday - 1));
+    final minggu = senin.add(const Duration(days: 7));
 
-    final data = List<Map<String, dynamic>>.from(res as List);
+    final res = await supabase
+        .from('denda')
+        .select('jumlah_denda, created_at')
+        .gte('created_at', senin.toIso8601String())
+        .lt('created_at', minggu.toIso8601String());
 
-    return data.fold<int>(0, (sum, d) => sum + (d['jumlah_denda'] as int));
+    if (res == null) return 0;
+
+    final List data = res as List;
+
+    int total = 0;
+    for (final d in data) {
+      final jumlah = d['jumlah_denda'];
+      if (jumlah is int) {
+        total += jumlah;
+      } else if (jumlah is num) {
+        total += jumlah.toInt();
+      }
+    }
+
+    return total;
   }
 
   void hitungAlatTerpopuler() {
@@ -167,7 +193,7 @@ class _HomePageState extends State<HomePage> {
           borderRadius: BorderRadius.circular(14),
         ),
         child: FutureBuilder<int>(
-          future: fetchTotalDenda(),
+          future: fetchTotalDendaMingguan(),
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
               return const Center(
@@ -179,13 +205,14 @@ class _HomePageState extends State<HomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  "Denda",
+                  "Denda Mingguan",
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
+
                 const SizedBox(height: 8),
 
                 Text(
-                  "Rp ${snapshot.data}",
+                  "Rp ${rupiah(snapshot.data!)}",
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -195,7 +222,7 @@ class _HomePageState extends State<HomePage> {
 
                 const SizedBox(height: 4),
                 const Text(
-                  "Total semua denda",
+                  "Total denda Senin – Minggu",
                   style: TextStyle(color: Colors.grey),
                 ),
 
