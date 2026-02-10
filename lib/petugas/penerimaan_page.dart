@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class PenerimaanPage extends StatefulWidget {
   final int peminjamanId;
   final int jumlah;
+
   const PenerimaanPage({
     super.key,
     required this.peminjamanId,
@@ -16,10 +17,12 @@ class PenerimaanPage extends StatefulWidget {
 
 class _PenerimaanPageState extends State<PenerimaanPage> {
   final supabase = Supabase.instance.client;
+
   bool isSubmitting = false;
-  String kondisi = 'Baik'; // default
-  TextEditingController catatanController = TextEditingController();
-  TextEditingController jumlahController = TextEditingController();
+  String kondisi = 'Baik';
+
+  final TextEditingController jumlahController = TextEditingController();
+  final TextEditingController catatanController = TextEditingController();
 
   @override
   void initState() {
@@ -27,69 +30,152 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
     jumlahController.text = widget.jumlah.toString();
   }
 
+  @override
+  void dispose() {
+    jumlahController.dispose();
+    catatanController.dispose();
+    super.dispose();
+  }
+
+  // ================= SUBMIT PENERIMAAN =================
   Future<void> submitPenerimaan() async {
+    final int jumlahKembali = int.tryParse(jumlahController.text) ?? 0;
+
+    if (jumlahKembali <= 0) {
+      _showSnack("Jumlah tidak valid");
+      return;
+    }
+
     setState(() => isSubmitting = true);
+
     try {
       await supabase
           .from('peminjaman')
           .update({
-            'status': 'selesai',
+            'status': 'selesai', // 🔑 STATUS FINAL
             'kondisi': kondisi,
-            'catatan': catatanController.text,
-            'jumlah': int.parse(jumlahController.text),
+            'catatan': catatanController.text.trim(),
+            'jumlah': jumlahKembali,
+            'tanggal_kembalikan': DateTime.now().toIso8601String(),
           })
           .eq('id', widget.peminjamanId);
 
-      if (mounted)
-        Navigator.pop(context, true); // kembali ke halaman sebelumnya
+      if (!mounted) return;
+      Navigator.pop(context, true);
     } catch (e) {
       debugPrint('ERROR Penerimaan: $e');
+      _showSnack("Gagal menyimpan penerimaan");
     } finally {
       if (mounted) setState(() => isSubmitting = false);
     }
   }
 
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Form Penerimaan Alat')),
-      body: Padding(
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        title: const Text('Form Penerimaan Alat'),
+        backgroundColor: const Color(0xFF3F2BFF),
+        foregroundColor: Colors.white,
+      ),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              controller: jumlahController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Jumlah dikembalikan',
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: kondisi,
-              decoration: const InputDecoration(labelText: 'Kondisi Alat'),
-              items: const [
-                DropdownMenuItem(value: 'Baik', child: Text('Baik')),
-                DropdownMenuItem(value: 'Rusak', child: Text('Rusak')),
-              ],
-              onChanged: (val) => setState(() => kondisi = val ?? 'Baik'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: catatanController,
-              decoration: const InputDecoration(
-                labelText: 'Catatan (opsional)',
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Data Pengembalian",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: isSubmitting ? null : submitPenerimaan,
-              child: isSubmitting
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Submit Penerimaan'),
-            ),
-          ],
+              const SizedBox(height: 16),
+
+              // ===== JUMLAH =====
+              TextField(
+                controller: jumlahController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Jumlah dikembalikan',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // ===== KONDISI =====
+              DropdownButtonFormField<String>(
+                value: kondisi,
+                decoration: const InputDecoration(
+                  labelText: 'Kondisi Alat',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'Baik', child: Text('Baik')),
+                  DropdownMenuItem(value: 'Rusak', child: Text('Rusak')),
+                ],
+                onChanged: (val) => setState(() => kondisi = val ?? 'Baik'),
+              ),
+
+              const SizedBox(height: 16),
+
+              // ===== CATATAN =====
+              TextField(
+                controller: catatanController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Catatan (opsional)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // ===== SUBMIT =====
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: ElevatedButton(
+                  onPressed: isSubmitting ? null : submitPenerimaan,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF3F2BFF),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Submit Penerimaan',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

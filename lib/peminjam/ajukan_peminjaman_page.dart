@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'peminjaman_saya_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AjukanPeminjamanPage extends StatefulWidget {
@@ -284,7 +285,24 @@ class _AjukanPeminjamanPageState extends State<AjukanPeminjamanPage> {
     });
 
     if (!mounted) return;
-    Navigator.pop(context);
+
+    // ✅ NOTIFIKASI
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Peminjaman berhasil diajukan"),
+        duration: Duration(seconds: 2),
+      ),
+    );
+
+    // ⏳ dikasih jeda sithik ben snackbar katon
+    await Future.delayed(const Duration(milliseconds: 600));
+
+    // ✅ PINDAH KE PEMINJAMAN SAYA
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const PeminjamanSayaPage()),
+      (route) => route.isFirst,
+    );
   }
 
   Widget _infoTile(String label, String value) {

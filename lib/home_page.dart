@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter/services.dart';
+import 'denda_admin_page.dart';
+import 'pie_alat_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -11,9 +12,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final supabase = Supabase.instance.client;
+  Map<String, int> dataAlat = {};
 
-  final TextEditingController hariCtrl = TextEditingController();
-  final TextEditingController dendaCtrl = TextEditingController();
   int totalDenda = 0;
   bool loading = true;
   List<Map<String, dynamic>> peminjamanAcc = [];
@@ -33,8 +33,6 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     searchCtrl.dispose();
-    hariCtrl.dispose();
-    dendaCtrl.dispose();
     super.dispose();
   }
 
@@ -79,6 +77,14 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<int> fetchTotalDenda() async {
+    final res = await supabase.from('denda').select('jumlah_denda');
+
+    final data = List<Map<String, dynamic>>.from(res as List);
+
+    return data.fold<int>(0, (sum, d) => sum + (d['jumlah_denda'] as int));
+  }
+
   void hitungAlatTerpopuler() {
     if (peminjamanAcc.isEmpty) return;
 
@@ -93,7 +99,7 @@ class _HomePageState extends State<HomePage> {
       counter[nama] = (counter[nama] ?? 0) + jumlah;
     }
 
-    if (counter.isEmpty) return; // 🔒 GUARD PENTING
+    if (counter.isEmpty) return;
 
     String topNama = counter.keys.first;
     int topJumlah = counter[topNama]!;
@@ -110,6 +116,7 @@ class _HomePageState extends State<HomePage> {
     if (!mounted) return;
 
     setState(() {
+      dataAlat = counter; // 🔥 SIMPEN SEMUA
       namaAlatTop = topNama;
       totalTop = topJumlah;
       persentaseTop = total == 0 ? 0 : topJumlah / total;
@@ -144,68 +151,65 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget hitungDenda() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Hitung Denda",
-          style: TextStyle(fontWeight: FontWeight.bold),
+  Widget hitungDenda(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const DendaAdminPage()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.red.shade50,
+          borderRadius: BorderRadius.circular(14),
         ),
-        const SizedBox(height: 12),
+        child: FutureBuilder<int>(
+          future: fetchTotalDenda(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              );
+            }
 
-        TextField(
-          controller: hariCtrl,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          decoration: const InputDecoration(
-            labelText: "Hari Telat",
-            border: OutlineInputBorder(),
-          ),
-          onChanged: (_) => _prosesDenda(),
-        ),
-        const SizedBox(height: 10),
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Denda",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 8),
 
-        TextField(
-          controller: dendaCtrl,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          decoration: const InputDecoration(
-            labelText: "Denda / Hari",
-            border: OutlineInputBorder(),
-          ),
-          onChanged: (_) => _prosesDenda(),
-        ),
-        const SizedBox(height: 12),
+                Text(
+                  "Rp ${snapshot.data}",
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
 
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.red.shade50,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(
-            "Total Denda: Rp ${totalDenda.toString()}",
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.red,
-            ),
-          ),
+                const SizedBox(height: 4),
+                const Text(
+                  "Total semua denda",
+                  style: TextStyle(color: Colors.grey),
+                ),
+
+                const SizedBox(height: 12),
+                const Align(
+                  alignment: Alignment.centerRight,
+                  child: Icon(Icons.arrow_forward_ios, size: 16),
+                ),
+              ],
+            );
+          },
         ),
-      ],
+      ),
     );
-  }
-
-  void _prosesDenda() {
-    final hari = int.tryParse(hariCtrl.text.trim()) ?? 0;
-    final denda = int.tryParse(dendaCtrl.text.trim()) ?? 0;
-
-    if (!mounted) return;
-
-    setState(() {
-      totalDenda = hari * denda;
-    });
   }
 
   /// ===== GRAFIK BUNDER PERSENTASE =====
@@ -222,21 +226,24 @@ class _HomePageState extends State<HomePage> {
     final persenText = (persentaseTop * 100).toStringAsFixed(0);
 
     return Column(
+      mainAxisAlignment: MainAxisAlignment.center, // 🔑 KUNCI UTAMA
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         const Text(
           "Persentase Alat Terpopuler",
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+
         Stack(
           alignment: Alignment.center,
           children: [
             SizedBox(
-              width: 140,
-              height: 140,
+              width: 120,
+              height: 120,
               child: CircularProgressIndicator(
                 value: persentaseTop.clamp(0.0, 1.0),
-                strokeWidth: 14,
+                strokeWidth: 10,
                 backgroundColor: Colors.grey.shade300,
                 valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
               ),
@@ -247,23 +254,23 @@ class _HomePageState extends State<HomePage> {
                 Text(
                   "$persenText%",
                   style: const TextStyle(
-                    fontSize: 26,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   namaAlatTop!,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 12),
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
                 ),
               ],
             ),
           ],
         ),
-        const SizedBox(height: 10),
+
+        const SizedBox(height: 12),
         Text(
           "$totalTop x disewa",
           style: const TextStyle(fontSize: 12, color: Colors.grey),
@@ -355,7 +362,7 @@ class _HomePageState extends State<HomePage> {
 
             /// ===== GRAFIK + TERPOPULER =====
             SizedBox(
-              height: 260, // 🔒 BATASI TINGGI
+              height: 240, // 🔒 BATASI TINGGI
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -365,14 +372,25 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     Expanded(
                       child: Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: SingleChildScrollView(
-                          physics: const NeverScrollableScrollPhysics(), // 🔑
-                          child: grafikBunderPersentase(),
+                          physics: const NeverScrollableScrollPhysics(),
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      PieAlatPage(dataAlat: dataAlat),
+                                ),
+                              );
+                            },
+                            child: grafikBunderPersentase(),
+                          ),
                         ),
                       ),
                     ),
@@ -392,7 +410,7 @@ class _HomePageState extends State<HomePage> {
                                 constraints: BoxConstraints(
                                   minHeight: constraints.maxHeight,
                                 ),
-                                child: hitungDenda(),
+                                child: hitungDenda(context),
                               ),
                             );
                           },

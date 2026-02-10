@@ -286,8 +286,8 @@ class _AlatPageState extends State<AlatPage> {
                               : widget.fromPeminjam
                               ? ElevatedButton(
                                   onPressed: alat['stok'] > 0
-                                      ? () {
-                                          Navigator.push(
+                                      ? () async {
+                                          final result = await Navigator.push(
                                             context,
                                             MaterialPageRoute(
                                               builder: (_) =>
@@ -296,12 +296,17 @@ class _AlatPageState extends State<AlatPage> {
                                                   ),
                                             ),
                                           );
+
+                                          if (result == true) {
+                                            setState(
+                                              () {},
+                                            ); // 🔥 refresh daftar alat
+                                          }
                                         }
                                       : null,
-
                                   child: const Text("Pinjam"),
                                 )
-                              : null,
+                              : const SizedBox.shrink(),
                         ),
                       );
                     },
