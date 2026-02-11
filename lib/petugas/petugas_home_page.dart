@@ -66,7 +66,7 @@ class _PetugasHomePageState extends State<PetugasHomePage> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        height: 100,
+        height: 104, // ✅ aman, ora overflow
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
@@ -94,13 +94,18 @@ class _PetugasHomePageState extends State<PetugasHomePage> {
               child: Icon(icon, color: Colors.white, size: 26),
             ),
             const SizedBox(width: 12),
+
+            /// TEXT AREA
             Expanded(
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min, // 🔑 penting
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -110,11 +115,14 @@ class _PetugasHomePageState extends State<PetugasHomePage> {
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
+                    maxLines: 1, // 🔑 cegah overflow
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: Colors.white70, fontSize: 11),
                   ),
                 ],
               ),
             ),
+
             const Icon(
               Icons.arrow_forward_ios,
               size: 14,

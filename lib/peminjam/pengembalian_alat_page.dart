@@ -188,6 +188,7 @@ class _PengembalianAlatPageState extends State<PengembalianAlatPage> {
                               ),
                             ),
                             onPressed: () {
+                              // ... bagian atas tetap sama
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -199,7 +200,7 @@ class _PengembalianAlatPageState extends State<PengembalianAlatPage> {
                                     onSubmit:
                                         ({
                                           required String statusPengembalian,
-                                          required String kerusakan,
+                                          required String alasanKeterlambatan,
                                         }) async {
                                           final user =
                                               supabase.auth.currentUser;
@@ -213,8 +214,9 @@ class _PengembalianAlatPageState extends State<PengembalianAlatPage> {
                                               .update({
                                                 'jumlah_dikembalikan': jumlah,
                                                 'status_pengembalian':
-                                                    statusPengembalian, // 🔥 BARU
-                                                'catatan_kerusakan': kerusakan,
+                                                    statusPengembalian,
+                                                'alasan_keterlambatan':
+                                                    alasanKeterlambatan,
                                                 'status':
                                                     'pengembalian_diajukan',
                                               })

@@ -68,24 +68,6 @@ class _LoginPageState extends State<LoginPage> {
     _redirectByRole(result['role']);
   }
 
-  // ================= LOGIN GOOGLE =================
-  Future<void> _loginGoogle() async {
-    setState(() => isLoading = true);
-
-    final result = await authService.loginWithGoogle();
-
-    setState(() => isLoading = false);
-
-    if (result['error'] != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(result['error'])));
-      return;
-    }
-
-    _redirectByRole(result['role']);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -158,7 +140,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 24),
 
-                // LOGIN EMAIL BUTTON
+                // LOGIN BUTTON
                 SizedBox(
                   width: double.infinity,
                   height: 45,
@@ -176,22 +158,6 @@ class _LoginPageState extends State<LoginPage> {
                             "LOGIN",
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // LOGIN GOOGLE BUTTON
-                SizedBox(
-                  width: double.infinity,
-                  height: 45,
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.g_mobiledata, size: 28),
-                    label: const Text(
-                      "Login dengan Google",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    onPressed: isLoading ? null : _loginGoogle,
                   ),
                 ),
               ],

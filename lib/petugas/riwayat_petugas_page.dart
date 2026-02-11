@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class RiwayatPetugasPage extends StatefulWidget {
   const RiwayatPetugasPage({super.key});
@@ -25,7 +28,13 @@ class _RiwayatPetugasPageState extends State<RiwayatPetugasPage> {
     try {
       final data = await supabase
           .from('peminjaman')
-          .select()
+          .select('''
+            id,
+            status,
+            created_at,
+            profiles:userid ( nama ),
+            alat:alatid ( nama_alat )
+          ''')
           .or('status.eq.selesai,status.eq.denda')
           .order('created_at', ascending: false);
 
@@ -41,29 +50,98 @@ class _RiwayatPetugasPageState extends State<RiwayatPetugasPage> {
     }
   }
 
-  // ================= HAPUS RIWAYAT =================
   Future<void> hapusRiwayat(int id) async {
     try {
       await supabase.from('peminjaman').delete().eq('id', id);
 
+      fetchRiwayat();
+
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Riwayat berhasil dihapus")));
-
-      fetchRiwayat();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Data berhasil dihapus"),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
-      debugPrint("HAPUS RIWAYAT ERROR: $e");
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Gagal menghapus riwayat")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Gagal hapus: $e"), backgroundColor: Colors.red),
+      );
     }
+  }
+
+  // ================= CETAK PDF =================
+  Future<void> cetakPdf() async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        build: (context) => [
+          pw.Text(
+            'LAPORAN RIWAYAT PEMINJAMAN',
+            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 16),
+          pw.Table.fromTextArray(
+            headers: const ['No', 'Peminjam', 'Alat', 'Status', 'Tanggal'],
+            data: List.generate(riwayat.length, (i) {
+              final item = riwayat[i];
+              final namaPeminjam = item['profiles']?['nama'] ?? '-';
+              final namaAlat = item['alat']?['nama_alat'] ?? '-';
+
+              return [
+                (i + 1).toString(),
+                namaPeminjam,
+                namaAlat,
+                item['status']?.toUpperCase() ?? '-',
+                item['created_at'] != null
+                    ? item['created_at'].toString().substring(0, 10)
+                    : '-',
+              ];
+            }),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
+            cellHeight: 30,
+          ),
+        ],
+      ),
+    );
+
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 
   // ================= UI =================
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey.shade100,
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: Colors.red,
+        icon: const Icon(Icons.picture_as_pdf),
+        label: const Text("PDF"),
+        onPressed: riwayat.isEmpty ? null : cetakPdf,
+      ),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: const Text(
+                "Riwayat Peminjaman",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+            ),
+            Expanded(child: _buildBody()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
     if (loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -77,8 +155,10 @@ class _RiwayatPetugasPageState extends State<RiwayatPetugasPage> {
       itemCount: riwayat.length,
       itemBuilder: (context, index) {
         final item = riwayat[index];
-
         final isDenda = item['status'] == 'denda';
+
+        final namaPeminjam = item['profiles']?['nama'] ?? '-';
+        final namaAlat = item['alat']?['nama_alat'] ?? '-';
 
         return Card(
           elevation: 2,
@@ -91,111 +171,84 @@ class _RiwayatPetugasPageState extends State<RiwayatPetugasPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ====== HEADER ======
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      item['nama_peminjam'] ?? 'Peminjam',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isDenda
-                            ? Colors.red.withOpacity(0.1)
-                            : Colors.green.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                    Expanded(
                       child: Text(
-                        item['status'].toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 12,
+                        namaPeminjam,
+                        style: const TextStyle(
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: isDenda ? Colors.red : Colors.green,
                         ),
                       ),
+                    ),
+
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isDenda
+                                ? Colors.red.withOpacity(0.15)
+                                : Colors.green.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            item['status'].toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isDenda ? Colors.red : Colors.green,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(width: 8),
+
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (_) => AlertDialog(
+                                title: const Text("Hapus Data"),
+                                content: const Text(
+                                  "Yakin ingin menghapus riwayat ini?",
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text("Batal"),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                    ),
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      hapusRiwayat(item['id']);
+                                    },
+                                    child: const Text("Hapus"),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),
 
                 const SizedBox(height: 8),
-
-                // ====== INFO ALAT ======
-                Row(
-                  children: [
-                    const Icon(Icons.inventory_2, size: 18, color: Colors.grey),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        item['nama_alat'] ?? '-',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 6),
-
-                // ====== TANGGAL ======
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.calendar_today,
-                      size: 16,
-                      color: Colors.grey,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      item['created_at'] != null
-                          ? item['created_at'].toString().substring(0, 10)
-                          : '-',
-                      style: const TextStyle(fontSize: 13, color: Colors.grey),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 10),
-
-                // ====== AKSI ======
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => AlertDialog(
-                          title: const Text("Hapus Riwayat"),
-                          content: const Text(
-                            "Yakin ingin menghapus riwayat ini?\nData tidak bisa dikembalikan.",
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text("Batal"),
-                            ),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                              ),
-                              onPressed: () {
-                                Navigator.pop(context);
-                                hapusRiwayat(item['id']);
-                              },
-                              child: const Text("Hapus"),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                Text("Alat : $namaAlat"),
+                Text(
+                  "Tanggal : ${item['created_at'] != null ? item['created_at'].toString().substring(0, 10) : '-'}",
+                  style: const TextStyle(color: Colors.grey),
                 ),
               ],
             ),

@@ -136,9 +136,8 @@ class _AlatPageState extends State<AlatPage> {
       'userid': supabase.auth.currentUser!.id,
     });
 
-    fetchAlat();
-
-    fetchAlat();
+    await fetchAlat();
+    if (!mounted) return;
 
     ScaffoldMessenger.of(
       context,
@@ -298,9 +297,7 @@ class _AlatPageState extends State<AlatPage> {
                                           );
 
                                           if (result == true) {
-                                            setState(
-                                              () {},
-                                            ); // 🔥 refresh daftar alat
+                                            await fetchAlat(); // ✅ AMBIL STOK TERBARU
                                           }
                                         }
                                       : null,

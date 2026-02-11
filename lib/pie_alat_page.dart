@@ -166,7 +166,7 @@ class PieAlatPage extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                "${e.value}x",
+                                "${e.value}",
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                 ),

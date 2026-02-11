@@ -26,14 +26,18 @@ class _DendaAdminPageState extends State<DendaAdminPage> {
     }
 
     var query = supabase.from('denda').select('''
-      id,
-      jumlah_denda,
-      status,
-      jenis_denda,
-      nama_alat,
-      created_at,
-      profiles:peminjamid ( nama )
-    ''');
+  id,
+  jumlah_denda,
+  status,
+  jenis_denda,
+  nama_alat,
+  created_at,
+  peminjaman (
+    profiles (
+      nama
+    )
+  )
+''');
 
     if (fromDate != null) {
       query = query.gte('created_at', fromDate.toIso8601String());
@@ -178,7 +182,9 @@ class _DendaAdminPageState extends State<DendaAdminPage> {
                   itemBuilder: (context, i) {
                     final d = data[i];
                     final status = d['status'];
-                    final peminjam = d['profiles']?['nama'] ?? '-';
+                    final peminjam =
+                        d['peminjaman']?['profiles']?['nama'] ?? '-';
+
                     final alat = d['nama_alat'] ?? '-';
                     final alasan = d['jenis_denda'] ?? '-';
 

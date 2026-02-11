@@ -5,7 +5,7 @@ class FormPengembalianPage extends StatefulWidget {
   final TextEditingController jumlahController;
   final Function({
     required String statusPengembalian,
-    required String kerusakan,
+    required String alasanKeterlambatan, // 🔥 ganti dari kerusakan
   })
   onSubmit;
 
@@ -22,7 +22,7 @@ class FormPengembalianPage extends StatefulWidget {
 
 class _FormPengembalianPageState extends State<FormPengembalianPage> {
   String? statusPengembalian;
-  final kerusakanController = TextEditingController();
+  final alasanKeterlambatanController = TextEditingController();
   int durasiHari = 0;
 
   @override
@@ -48,7 +48,7 @@ class _FormPengembalianPageState extends State<FormPengembalianPage> {
 
   @override
   void dispose() {
-    kerusakanController.dispose();
+    alasanKeterlambatanController.dispose();
     super.dispose();
   }
 
@@ -133,9 +133,9 @@ class _FormPengembalianPageState extends State<FormPengembalianPage> {
 
             /// CATATAN KERUSAKAN
             TextField(
-              controller: kerusakanController,
+              controller: alasanKeterlambatanController,
               maxLines: 2,
-              decoration: _inputDecoration("Catatan Kerusakan (opsional)"),
+              decoration: _inputDecoration("Alasan Keterlambatan (opsional)"),
             ),
 
             const SizedBox(height: 28),
@@ -144,7 +144,7 @@ class _FormPengembalianPageState extends State<FormPengembalianPage> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (statusPengembalian == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -154,13 +154,48 @@ class _FormPengembalianPageState extends State<FormPengembalianPage> {
                     return;
                   }
 
-                  widget.onSubmit(
+                  final status = widget.peminjaman['status'] ?? '';
+
+                  // 🔹 Nek wis diajukan
+                  if (status == 'pengembalian_diajukan') {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          "Pengembalian alat ini sudah diajukan sebelumnya",
+                        ),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                    return;
+                  }
+
+                  // 🔥 Nek wis benar-benar dikembalikan
+                  if (status == 'dikembalikan') {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Alat ini sudah dikembalikan ✅"),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                    return;
+                  }
+
+                  // Submit normal
+                  await widget.onSubmit(
                     statusPengembalian: statusPengembalian!,
-                    kerusakan: kerusakanController.text,
+                    alasanKeterlambatan: alasanKeterlambatanController.text,
+                  );
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Pengembalian berhasil diajukan ✅"),
+                      backgroundColor: Colors.green,
+                    ),
                   );
 
                   Navigator.pop(context);
                 },
+
                 child: const Text("Simpan Pengembalian"),
               ),
             ),

@@ -63,6 +63,9 @@ class _PengajuanPageState extends State<PengajuanPage> {
       // 1️⃣ update status dulu
       await supabase.from('peminjaman').update({'status': status}).eq('id', id);
 
+      // 🔥 TAMBAH INI
+      await Future.delayed(const Duration(milliseconds: 300));
+
       // 2️⃣ baru bikin log
       String aksiLog = '';
       if (status == 'dipinjam') {
@@ -278,7 +281,7 @@ class _PengajuanPageState extends State<PengajuanPage> {
                                         alatNama: namaAlat,
                                       ),
 
-                                      child: const Text("TERIMA"),
+                                      child: const Text("Terima"),
                                     ),
                                     const SizedBox(width: 8),
                                     ElevatedButton(

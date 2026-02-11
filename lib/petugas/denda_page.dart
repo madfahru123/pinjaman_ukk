@@ -28,14 +28,15 @@ class _DendaPageState extends State<DendaPage> {
       final data = await supabase
           .from('denda')
           .select('''
-        id,
-        peminjamid,
-        jumlah_denda,
-        status,
-        jenis_denda,
-        nama_alat,
-        profiles:peminjamid ( nama )
-      ''')
+            id,
+            jumlah_denda,
+            status,
+            jenis_denda,
+            peminjaman:peminjaman_id (
+              profiles:userid ( nama ),
+              alat:alatid ( nama_alat )
+            )
+          ''')
           .order('id', ascending: false);
 
       if (!mounted) return;
@@ -135,7 +136,10 @@ class _DendaPageState extends State<DendaPage> {
   // ================= DENDA CARD =================
   Widget _dendaCard(Map<String, dynamic> item) {
     final bool lunas = item['status'] == 'lunas';
-    final peminjam = item['profiles']?['nama'] ?? '-';
+
+    final peminjam = item['peminjaman']?['profiles']?['nama'] ?? '-';
+
+    final namaAlat = item['peminjaman']?['alat']?['nama_alat'] ?? '-';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -154,7 +158,7 @@ class _DendaPageState extends State<DendaPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ===== HEADER =====
+          // HEADER
           Row(
             children: [
               Expanded(
@@ -192,13 +196,11 @@ class _DendaPageState extends State<DendaPage> {
           const SizedBox(height: 8),
 
           Text(
-            'Alasan : ${item['jenis_denda'] ?? '-'}',
+            'Alasan : ${item['jenis_denda']}',
             style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
-          Text(
-            'Alat : ${item['nama_alat'] ?? '-'}',
-            style: const TextStyle(fontSize: 12),
-          ),
+
+          Text('Alat : $namaAlat', style: const TextStyle(fontSize: 12)),
 
           const Divider(height: 20),
 
